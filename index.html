@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MyFinance - Gestão Estruturada</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="dark-theme">
+    <div class="app-container">
+        <aside class="sidebar">
+            <div class="logo">
+                <i data-lucide="wallet"></i>
+                <span>MyFinance</span>
+            </div>
+            <nav id="sidebar-nav">
+                <button class="nav-item active" data-tab="tab-dashboard">
+                    <i data-lucide="layout-dashboard"></i> Resumo Geral
+                </button>
+                <button class="nav-item" data-tab="tab-cartao">
+                    <i data-lucide="credit-card"></i> Detalhes Cartão
+                </button>
+                <button class="nav-item" data-tab="tab-manuais">
+                    <i data-lucide="hand-coins"></i> Gastos Manuais
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button class="btn btn-primary w-100" id="btn-save-month">
+                    <i data-lucide="check-circle"></i> Salvar Alterações
+                </button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header>
+                <div class="header-info">
+                    <h1>Gestão de <span id="current-month-display">Maio 2026</span></h1>
+                    <div class="month-navigator">
+                        <button id="prev-month" class="btn-icon"><i data-lucide="chevron-left"></i></button>
+                        <button id="next-month" class="btn-icon"><i data-lucide="chevron-right"></i></button>
+                    </div>
+                </div>
+                <div class="header-actions">
+                    <label for="csv-upload" class="btn btn-secondary">
+                        <i data-lucide="upload-cloud"></i> Importar CSV
+                        <input type="file" id="csv-upload" accept=".csv" style="display: none;">
+                    </label>
+                    <button class="btn btn-secondary" id="btn-add-manual">
+                        <i data-lucide="plus"></i> Gasto Manual
+                    </button>
+                    <button class="btn btn-icon-only" id="btn-backup" title="Download Backup">
+                        <i data-lucide="download" style="width: 20px; height: 20px;"></i>
+                    </button>
+                    <label for="restore-backup" class="btn btn-icon-only" title="Restaurar Backup">
+                        <i data-lucide="upload" style="width: 20px; height: 20px;"></i>
+                        <input type="file" id="restore-backup" accept=".json" style="display: none;">
+                    </label>
+                </div>
+            </header>
+
+            <!-- TABS CONTENT -->
+
+            <!-- 1. DASHBOARD -->
+            <div id="tab-dashboard" class="tab-content active">
+                <section class="stats-grid">
+                    <div class="stat-card gold">
+                        <div class="stat-icon"><i data-lucide="credit-card"></i></div>
+                        <div class="stat-details">
+                            <span class="label">Total Cartão</span>
+                            <h3 id="total-card">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon"><i data-lucide="banknote"></i></div>
+                        <div class="stat-details">
+                            <span class="label">Total Manual</span>
+                            <h3 id="total-manual">R$ 0,00</h3>
+                        </div>
+                    </div>
+                    <div class="stat-card income-stat">
+                        <div class="stat-icon"><i data-lucide="trending-up"></i></div>
+                        <div class="stat-details">
+                            <span class="label">Renda Total</span>
+                            <h3 id="total-income">R$ 0,00</h3>
+                        </div>
+                        <button class="btn-edit-small" id="btn-edit-income"><i data-lucide="pencil"></i></button>
+                    </div>
+                    <div class="stat-card balance-stat">
+                        <div class="stat-icon"><i data-lucide="calculator"></i></div>
+                        <div class="stat-details">
+                            <span class="label">Saldo Final</span>
+                            <h3 id="total-balance">R$ 0,00</h3>
+                        </div>
+                    </div>
+                </section>
+
+                <div class="dashboard-grid">
+                    <div class="card chart-container">
+                        <div class="card-header">
+                            <h2>Distribuição do Mês</h2>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                    <div class="card chart-container">
+                        <div class="card-header">
+                            <h2>Histórico de Gastos</h2>
+                        </div>
+                        <div class="chart-wrapper">
+                            <canvas id="historyChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. DETALHES CARTÃO -->
+            <div id="tab-cartao" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Detalhamento da Fatura (Importado)</h2>
+                        <span class="badge" id="card-count-badge">0 itens</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Categoria</th>
+                                    <th>Valor</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="card-transactions-body">
+                                <tr>
+                                    <td colspan="5" class="empty-state">Importe um CSV para ver o detalhamento.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3. GASTOS MANUAIS -->
+            <div id="tab-manuais" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Gastos Fora do Cartão</h2>
+                        <span class="badge" id="manual-count-badge">0 itens</span>
+                    </div>
+                    <div class="table-wrapper">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Descrição</th>
+                                    <th>Categoria</th>
+                                    <th>Valor</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="manual-transactions-body">
+                                <tr>
+                                    <td colspan="5" class="empty-state">Adicione gastos manuais para este mês.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Modal Manual Entry -->
+    <div id="modal-manual" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Novo Gasto Manual</h2>
+                <button class="close-modal">&times;</button>
+            </div>
+            <form id="form-manual">
+                <div class="form-group">
+                    <label>Descrição</label>
+                    <input type="text" id="manual-desc" placeholder="Ex: Aluguel" required>
+                </div>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Valor Total (R$)</label>
+                        <input type="number" step="0.01" id="manual-value" placeholder="0,00" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Parcelas</label>
+                        <input type="number" id="manual-installments" value="1" min="1" max="60" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Data da 1ª Parcela</label>
+                    <input type="date" id="manual-date" required>
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <select id="manual-category">
+                        <option value="Moradia">Moradia</option>
+                        <option value="Alimentação">Alimentação</option>
+                        <option value="Transporte">Transporte</option>
+                        <option value="Lazer">Lazer</option>
+                        <option value="Outros" selected>Outros</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Adicionar à Lista</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Renda -->
+    <div id="modal-income" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Definir Renda do Mês</h2>
+                <button class="close-modal" id="close-income">&times;</button>
+            </div>
+            <form id="form-income">
+                <div class="form-group">
+                    <label>Salário Líquido (R$)</label>
+                    <input type="number" step="0.01" id="income-salary" placeholder="0,00" required>
+                </div>
+                <div class="form-group">
+                    <label>Rendas Extras (R$)</label>
+                    <input type="number" step="0.01" id="income-extra" placeholder="0,00" value="0">
+                </div>
+                <button type="submit" class="btn btn-primary w-100">Salvar Renda</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Parcelar/Replicar Transação -->
+    <div id="modal-replicate" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Parcelar Transação</h2>
+                <button class="close-modal" id="close-replicate">&times;</button>
+            </div>
+            <p style="margin-bottom: 1rem; font-size: 0.9rem; color: var(--text-muted);">Isso criará cópias deste gasto
+                para os meses futuros.</p>
+            <div class="form-group">
+                <label>Número Total de Parcelas</label>
+                <input type="number" id="replicate-months" min="2" max="60" value="2">
+            </div>
+            <button id="btn-confirm-replicate" class="btn btn-primary w-100">Gerar Parcelas Futuras</button>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script src="main.js"></script>
+</body>
+
+</html>
