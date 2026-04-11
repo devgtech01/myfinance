@@ -325,7 +325,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     parsed = results.map(i => {
                         const val = cleanVal(i['Valor']);
                         const title = cleanTitle(i['Lançamento'] || i['Lancamento']);
-                        if (val <= 0 || title.includes('PAGAMENTO')) return null;
+                        if (val === 0 || title.includes('PAGAMENTO')) return null;
                         
                         // Manter o dia original, mas forçar mês/ano do contexto atual
                         const originalDay = (i['Data'] || "").split('/')[0] || "01";
@@ -337,7 +337,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     parsed = results.map(i => {
                         const val = parseFloat(i['amount']);
                         const title = cleanTitle(i['title']);
-                        if (val <= 0 || title.includes('PAGAMENTO')) return null;
+                        if (val === 0 || title.includes('PAGAMENTO')) return null;
                         
                         const originalDay = (i['date'] || "").split('-')[2] || "01";
                         const forcedDate = `${targetKey}-${originalDay.padStart(2, '0')}`;
