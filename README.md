@@ -35,7 +35,7 @@
 
 ## 👤 Desenvolvedor
 
-Desenvolvido com ☕ por [gasoferreira](https://github.com/gasoferreira).
+Desenvolvido com ☕ por [DEVGTECH](https://github.com/devgtech/).
 
 ---
 *Este projeto foi criado como uma solução personalizada para automação e controle de finanças pessoais.*
