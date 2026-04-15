@@ -35,7 +35,7 @@
 
 ## 👤 Desenvolvedor
 
-Desenvolvido com ☕ por [DEVGTECH](https://github.com/devgtech/).
+Desenvolvido com ☕ por [DEVGTECH](https://github.com/devgtech01/).
 
 ---
 *Este projeto foi criado como uma solução personalizada para automação e controle de finanças pessoais.*
