@@ -50,7 +50,16 @@ document.addEventListener('DOMContentLoaded', () => {
         modalReplicate: document.getElementById('modal-replicate'),
         btnConfirmReplicate: document.getElementById('btn-confirm-replicate'),
         replicateInput: document.getElementById('replicate-months'),
-        closeModal: document.querySelectorAll('.close-modal')
+        closeModal: document.querySelectorAll('.close-modal'),
+
+        // AI Elements
+        btnAiAudit: document.getElementById('btn-ai-audit'),
+        modalAiResults: document.getElementById('modal-ai-results'),
+        aiContent: document.getElementById('ai-results-content'),
+        aiLoading: document.getElementById('ai-loading'),
+        btnApplyAi: document.getElementById('btn-apply-ai'),
+        btnSaveKey: document.getElementById('btn-save-key'),
+        aiApiKey: document.getElementById('ai-api-key')
     };
 
     let catChart = null;
@@ -578,6 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
             el.modalManual.style.display = 'none';
             el.modalIncome.style.display = 'none';
             if (el.modalReplicate) el.modalReplicate.style.display = 'none';
+            if (el.modalAiResults) el.modalAiResults.style.display = 'none';
         };
     });
 
@@ -643,6 +653,115 @@ document.addEventListener('DOMContentLoaded', () => {
         e.target.value = '';
     };
 
+    // --- AI LOGIC ---
+    let aiSuggestions = [];
+
+    const loadAiKey = () => {
+        const key = localStorage.getItem('gemini_api_key');
+        if (key) el.aiApiKey.value = key;
+    };
+
+    el.btnSaveKey.onclick = () => {
+        const key = el.aiApiKey.value.trim();
+        if (key) {
+            localStorage.setItem('gemini_api_key', key);
+            alert("Chave de API salva com sucesso!");
+        }
+    };
+
+    el.btnAiAudit.onclick = async () => {
+        const key = localStorage.getItem('gemini_api_key');
+        if (!key) {
+            alert("Por favor, configure sua chave de API na aba 'IA Assistant'.");
+            return;
+        }
+
+        const mKey = getMonthKey(state.currentDate);
+        const savedMonth = state.consolidated[mKey] || { transactions: [] };
+        const allTxs = [...savedMonth.transactions, ...state.draft];
+
+        if (allTxs.length === 0) {
+            alert("Não há transações para analisar neste mês.");
+            return;
+        }
+
+        el.modalAiResults.style.display = 'block';
+        el.aiLoading.style.display = 'block';
+        el.aiContent.innerHTML = '';
+        el.btnApplyAi.style.display = 'none';
+
+        const prompt = `Você é um auditor financeiro. Analise estas transações de cartão de crédito em formato JSON e retorne um ARRAY de sugestões no formato JSON: 
+        [{"id": "id_da_transacao", "field": "amount|category|title", "oldValue": "valor_antigo", "newValue": "valor_sugerido", "reason": "explicação_curta"}]
+        
+        Regras:
+        1. Identifique se o sinal (positivo/negativo) parece estar errado. Reembolsos e pagamentos devem ser negativos. Compras positivas.
+        2. Sugira categorias melhores com base no título.
+        3. Identifique duplicatas.
+        
+        Transações: ${JSON.stringify(allTxs.map(t => ({id: t.id, title: t.title, amount: t.amount, category: t.category, date: t.date})))}
+        
+        Retorne APENAS o JSON bruto no formato de array.`;
+
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+            });
+
+            const data = await response.json();
+            const rawText = data.candidates[0].content.parts[0].text;
+            const cleanJson = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+            aiSuggestions = JSON.parse(cleanJson);
+
+            renderAiResults(aiSuggestions);
+        } catch (err) {
+            el.aiContent.innerHTML = `<p style="color: var(--danger)">Erro ao consultar IA: ${err.message}</p>`;
+        } finally {
+            el.aiLoading.style.display = 'none';
+        }
+    };
+
+    const renderAiResults = (suggestions) => {
+        if (!suggestions || suggestions.length === 0) {
+            el.aiContent.innerHTML = '<p>A IA não encontrou inconsistências. Tudo parece correto!</p>';
+            return;
+        }
+
+        el.btnApplyAi.style.display = 'block';
+        el.aiContent.innerHTML = suggestions.map(s => `
+            <div class="ai-suggestion-item ${s.field === 'amount' ? 'warning' : ''}">
+                <h4>${s.reason}</h4>
+                <p>De: <b>${s.oldValue}</b> para <b>${s.newValue}</b></p>
+                <small>ID: ${s.id}</small>
+            </div>
+        `).join('');
+    };
+
+    el.btnApplyAi.onclick = () => {
+        aiSuggestions.forEach(s => {
+            // Aplicar no draft
+            const dIdx = state.draft.findIndex(t => t.id === s.id);
+            if (dIdx !== -1) {
+                state.draft[dIdx][s.field] = s.newValue;
+            } else {
+                // Aplicar no consolidado
+                const mKey = getMonthKey(state.currentDate);
+                if (state.consolidated[mKey]) {
+                    const cIdx = state.consolidated[mKey].transactions.findIndex(t => t.id === s.id);
+                    if (cIdx !== -1) state.consolidated[mKey].transactions[cIdx][s.field] = s.newValue;
+                }
+            }
+        });
+
+        saveToDisk();
+        updateUI();
+        el.modalAiResults.style.display = 'none';
+        alert("Sugestões da IA aplicadas com sucesso!");
+    };
+
     loadData();
+    loadAiKey();
     lucide.createIcons();
 });
