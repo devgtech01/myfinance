@@ -685,24 +685,33 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- AI LOGIC ---
+    // COLOQUE SUA CHAVE PADRÃO ABAIXO (Caso queira que outros usuários já comecem com IA ativa)
+    const GEMINI_API_KEY_DEFAULT = "SUA_CHAVE_AQUI";
+
     let aiSuggestions = [];
 
     const loadAiKey = () => {
         const key = localStorage.getItem('gemini_api_key');
-        if (key) el.aiApiKey.value = key;
+        if (key) {
+            el.aiApiKey.value = key;
+        } else if (GEMINI_API_KEY_DEFAULT !== "SUA_CHAVE_AQUI") {
+            el.aiApiKey.value = "CHAVE_PADRAO_ATIVA";
+            el.aiApiKey.placeholder = "Usando chave padrão do sistema";
+        }
     };
 
     el.btnSaveKey.onclick = () => {
         const key = el.aiApiKey.value.trim();
-        if (key) {
+        if (key && key !== "CHAVE_PADRAO_ATIVA") {
             localStorage.setItem('gemini_api_key', key);
-            alert("Chave de API salva com sucesso!");
+            alert("Chave de API personalizada salva com sucesso!");
         }
     };
 
     el.btnAiAudit.onclick = async () => {
-        const key = localStorage.getItem('gemini_api_key');
-        if (!key) {
+        let key = localStorage.getItem('gemini_api_key') || GEMINI_API_KEY_DEFAULT;
+        
+        if (!key || key === "SUA_CHAVE_AQUI") {
             alert("Por favor, configure sua chave de API na aba 'IA Assistant'.");
             return;
         }
