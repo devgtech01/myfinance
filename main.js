@@ -258,7 +258,7 @@ document.addEventListener('DOMContentLoaded', () => {
             saveToDisk();
             updateUI();
             el.modalReplicate.style.display = 'none';
-            alert(`${numMonths - 1} parcelas futuras geradas com sucesso!`);
+            alert(`${numMonths - 1} parcelas futuras geradas. Navegue pelos meses para conferir!`);
         }
     };
 
@@ -497,17 +497,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const mKey = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
             const mData = state.consolidated[mKey] || { transactions: [] };
             const total = mData.transactions.reduce((sum, t) => sum + (t.excluded ? 0 : t.amount), 0);
-            return Math.max(0, total); // Não deixar a barra ir para baixo de zero
+            return Math.max(0, total);
         });
 
         const histIncome = monthNames.map((_, idx) => {
             const mKey = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
             const mData = state.consolidated[mKey] || { income: { salary: 0, extra: 0 } };
-            return (parseFloat(mData.income.salary) || 0) + (parseFloat(mData.income.extra) || 0);
+            const inc = mData.income || { salary: 0, extra: 0 };
+            return (parseFloat(inc.salary) || 0) + (parseFloat(inc.extra) || 0);
         });
 
         const histCtx = document.getElementById('historyChart').getContext('2d');
         if (histChart) histChart.destroy();
+        
         histChart = new Chart(histCtx, {
             type: 'bar',
             data: {
@@ -519,17 +521,18 @@ document.addEventListener('DOMContentLoaded', () => {
                         data: histIncome,
                         borderColor: '#22c55e',
                         backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                        borderWidth: 3,
-                        tension: 0.4,
-                        pointRadius: 4,
-                        fill: false
+                        borderWidth: 2,
+                        tension: 0.3,
+                        pointRadius: 3,
+                        fill: false,
+                        zIndex: 10
                     },
                     {
                         type: 'bar',
                         label: 'Gastos',
                         data: histTotals,
                         backgroundColor: '#6366f1',
-                        borderRadius: 8
+                        borderRadius: 4
                     }
                 ]
             },
@@ -537,21 +540,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 responsive: true,
                 maintainAspectRatio: false,
                 scales: {
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
-                    x: { ticks: { color: '#94a3b8' } }
-                },
-                plugins: {
-                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', boxWidth: 12 } }
-                },
-                onClick: (evt, elements) => {
-                    if (elements.length > 0) {
-                        const idx = elements[0].index;
-                        state.currentDate = new Date(currentYear, idx, 1);
-                        updateUI();
+                    y: { 
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255,255,255,0.05)' }, 
+                        ticks: { color: '#94a3b8', callback: (v) => 'R$ ' + v } 
+                    },
+                    x: { 
+                        grid: { display: false },
+                        ticks: { color: '#94a3b8' } 
                     }
                 },
-                onHover: (evt, elements) => {
-                    evt.native.target.style.cursor = elements.length > 0 ? 'pointer' : 'default';
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', boxWidth: 10, font: { size: 10 } } }
                 }
             }
         });
