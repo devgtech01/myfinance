@@ -146,7 +146,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             row.innerHTML = `
                 <td>${formatPtDate(t.date)}</td>
-                <td>${t.title} ${isDraft ? '<span class="badge">Novo</span>' : ''}</td>
+                <td>${t.title} ${isDraft ? '<span class="badge">Novo</span>' : ''} ${t.amount < 0 ? '<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;">Crédito</span>' : ''}</td>
                 <td>
                     <select class="category-select" data-id="${t.id}">
                         ${options}
@@ -524,15 +524,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!s) return 0;
         let str = s.toString().toUpperCase().replace('R$', '').replace(/\s/g, '');
         
-        // No contexto de fatura de cartão:
-        // Sinais de "-" ou "+" ou a palavra "CRÉDITO" indicam que o valor deve subtrair do total.
-        const isCredit = str.includes('-') || str.includes('+') || str.includes('CREDIT');
+        // Identifica se é um crédito (reembolso, estorno ou sinal de menos/mais)
+        const isCredit = str.includes('-') || str.includes('+') || str.includes('CREDIT') || str.includes('ESTORNO');
         
         // Remove tudo que não for número, vírgula ou ponto
         let cleaned = str.replace(/[^0-9,/.]/g, '');
         
-        // Trata formato brasileiro: remove pontos de milhar e troca vírgula decimal por ponto
-        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+        // Lógica Inteligente de Formato:
+        if (cleaned.includes(',')) {
+            // Se tem vírgula, padrão brasileiro: ponto é milhar (remove), vírgula é decimal (troca)
+            cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+        } else {
+            // Se NÃO tem vírgula, o ponto já é o decimal (padrão internacional/CSV)
+            // Não removemos nada, o parseFloat já entende o ponto.
+        }
         
         const val = parseFloat(cleaned) || 0;
         return isCredit ? -Math.abs(val) : Math.abs(val);
