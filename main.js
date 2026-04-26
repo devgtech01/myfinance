@@ -122,11 +122,12 @@ document.addEventListener('DOMContentLoaded', () => {
         renderTable(el.cardTable, cardTxs, el.cardCount);
         renderTable(el.manualTable, manualTxs, el.manualCount);
 
-        // Charts (Only show consolidated data in charts? Or both? User said "depois aparece em resumo")
-        // I'll show only consolidated in the summary, and maybe a "Draft" indicator?
-        // Actually, user said: "depois eu salvo ai depois aparece em resumo o quanto que eu gastei no gráfico do mês"
-        // So charts = Consolidated only.
-        updateCharts(savedMonth.transactions);
+        // Charts
+        try {
+            updateCharts(savedMonth.transactions || []);
+        } catch (e) {
+            console.error("Erro ao atualizar gráficos:", e);
+        }
 
         lucide.createIcons();
     };
@@ -844,7 +845,14 @@ document.addEventListener('DOMContentLoaded', () => {
         alert("Sugestões da IA aplicadas com sucesso!");
     };
 
-    loadData();
-    loadAiKey();
-    lucide.createIcons();
+    // --- INITIALIZATION ---
+    try {
+        loadData();
+        loadAiKey();
+    } catch (e) {
+        console.error("Erro na inicialização:", e);
+    }
+    
+    // Garantia final de ícones
+    setTimeout(() => lucide.createIcons(), 500);
 });
