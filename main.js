@@ -439,6 +439,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount: installmentValue,
                 origin: 'Manual',
                 category: category
+            });
+        }
+
         state.draft.push(...newEntries);
         el.modalManual.style.display = 'none';
         el.formManual.reset();
