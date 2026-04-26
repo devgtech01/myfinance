@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${options}
                     </select>
                 </td>
-                <td>${formatBRL(t.amount)}</td>
+                <td class="${t.amount < 0 ? 'amount-positive' : 'amount-negative'}">${formatBRL(t.amount)}</td>
                 <td>
                     <div class="table-actions">
                         <button class="btn-action btn-move" data-id="${t.id}" title="Mover Mês">
@@ -323,9 +323,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 if (headers.includes('lancamento') || headers.includes('lançamento')) {
                     parsed = results.map(i => {
-                        const val = cleanVal(i['Valor']);
+                        const rawVal = i['Valor'];
                         const title = cleanTitle(i['Lançamento'] || i['Lancamento']);
-                        if (val === 0 || title.includes('PAGAMENTO')) return null;
+                        const val = cleanVal(rawVal);
+                        
+                        if (val === 0) return null;
+                        
+                        // Ignorar apenas pagamentos de fatura, manter estornos/reembolsos
+                        const isBill = (title.includes('PAGAMENTO') || title.includes('PGTO')) && 
+                                     (title.includes('FATURA') || title.includes('RECEBIDO') || title.includes('EFETUADO') || title.includes('ON LINE'));
+                        const isCredit = title.includes('ESTORNO') || title.includes('REEMBOLSO') || title.includes('CREDITO') || title.includes('CRÉDITO');
+                        
+                        if (isBill && !isCredit) return null;
                         
                         // Manter o dia original, mas forçar mês/ano do contexto atual
                         const originalDay = (i['Data'] || "").split('/')[0] || "01";
@@ -335,12 +344,26 @@ document.addEventListener('DOMContentLoaded', () => {
                     });
                 } else {
                     parsed = results.map(i => {
-                        const val = parseFloat(i['amount']);
-                        const title = cleanTitle(i['title']);
-                        if (val === 0 || title.includes('PAGAMENTO')) return null;
+                        const val = cleanVal(i['amount'] || i['valor']);
+                        const title = cleanTitle(i['title'] || i['descrição'] || i['lancamento']);
                         
-                        const originalDay = (i['date'] || "").split('-')[2] || "01";
-                        const forcedDate = `${targetKey}-${originalDay.padStart(2, '0')}`;
+                        if (val === 0) return null;
+
+                        const isBill = (title.includes('PAGAMENTO') || title.includes('PGTO')) && 
+                                     (title.includes('FATURA') || title.includes('RECEBIDO') || title.includes('EFETUADO'));
+                        const isCredit = title.includes('ESTORNO') || title.includes('REEMBOLSO') || title.includes('CREDITO') || title.includes('CRÉDITO');
+                        
+                        if (isBill && !isCredit) return null;
+                        
+                        const rawDate = i['date'] || i['data'] || "";
+                        let originalDay = "01";
+                        if (rawDate.includes('/')) {
+                            originalDay = rawDate.split('/')[0]; // DD/MM/YYYY
+                        } else if (rawDate.includes('-')) {
+                            const parts = rawDate.split('-');
+                            originalDay = parts.length === 3 ? parts[2] : parts[0]; // YYYY-MM-DD or DD-MM-YYYY
+                        }
+                        const forcedDate = `${targetKey}-${originalDay.toString().padStart(2, '0')}`;
                         
                         return { id: Math.random().toString(36).substr(2, 9), date: forcedDate, title, amount: val, origin: 'Cartão', category: categorize(title) };
                     });
@@ -497,7 +520,23 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatMonthDisplay = (d) => d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
     const formatPtDate = (s) => { if(!s) return ''; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
     const parseInterDate = (s) => { const [d,m,y] = s.split('/'); return `${y}-${m}-${d}`; };
-    const cleanVal = (s) => parseFloat((s || "0").replace('R$', '').replace(/\./g, '').replace(',', '.').trim());
+    const cleanVal = (s) => {
+        if (!s) return 0;
+        let str = s.toString().toUpperCase().replace('R$', '').replace(/\s/g, '');
+        
+        // No contexto de fatura de cartão:
+        // Sinais de "-" ou "+" ou a palavra "CRÉDITO" indicam que o valor deve subtrair do total.
+        const isCredit = str.includes('-') || str.includes('+') || str.includes('CREDIT');
+        
+        // Remove tudo que não for número, vírgula ou ponto
+        let cleaned = str.replace(/[^0-9,/.]/g, '');
+        
+        // Trata formato brasileiro: remove pontos de milhar e troca vírgula decimal por ponto
+        cleaned = cleaned.replace(/\./g, '').replace(',', '.');
+        
+        const val = parseFloat(cleaned) || 0;
+        return isCredit ? -Math.abs(val) : Math.abs(val);
+    };
     const cleanTitle = (s) => (s || "").toUpperCase().replace(/PARCELA \d+\/\d+/g, '').replace(/^(MP \*|EC \*|DM \*|IP \*|PP \*)/g, '').trim();
     const formatBRL = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
     const categorize = (t) => {
