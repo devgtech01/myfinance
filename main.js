@@ -18,30 +18,30 @@ document.addEventListener('DOMContentLoaded', () => {
         monthDisplay: document.getElementById('current-month-display'),
         prevMonth: document.getElementById('prev-month'),
         nextMonth: document.getElementById('next-month'),
-        
+
         // Tables
         cardTable: document.getElementById('card-transactions-body'),
         manualTable: document.getElementById('manual-transactions-body'),
         cardCount: document.getElementById('card-count-badge'),
         manualCount: document.getElementById('manual-count-badge'),
-        
+
         // Stats
         totalCard: document.getElementById('total-card'),
         totalManual: document.getElementById('total-manual'),
         totalIncome: document.getElementById('total-income'),
         totalBalance: document.getElementById('total-balance'),
-        
+
         // Actions
         csvUpload: document.getElementById('csv-upload'),
         btnManual: document.getElementById('btn-add-manual'),
         btnEditIncome: document.getElementById('btn-edit-income'),
         btnSave: document.getElementById('btn-save-month'),
         btnBackup: document.getElementById('btn-backup'),
-        
+
         // Navigation / Tabs
         navItems: document.querySelectorAll('.nav-item'),
         tabContents: document.querySelectorAll('.tab-content'),
-        
+
         // Modals
         modalManual: document.getElementById('modal-manual'),
         formManual: document.getElementById('form-manual'),
@@ -88,7 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // But let's filter by the selected month to be precise
         const currentDraft = state.draft.filter(t => getMonthKey(new Date(t.date + 'T12:00:00')) === mKey);
         const savedMonth = state.consolidated[mKey] || { transactions: [], income: { salary: 0, extra: 0 } };
-        
+
         // Combined view for the specific month
         const allTransactions = [...savedMonth.transactions, ...currentDraft];
 
@@ -103,7 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const income = savedMonth.income || { salary: 0, extra: 0 };
         const incomeTotal = (parseFloat(income.salary) || 0) + (parseFloat(income.extra) || 0);
         const finalBalance = incomeTotal - expensesTotal;
-        
+
         el.totalCard.textContent = formatBRL(cardSum);
         el.totalManual.textContent = formatBRL(manualSum);
         el.totalIncome.textContent = formatBRL(incomeTotal);
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Actually, user said: "depois eu salvo ai depois aparece em resumo o quanto que eu gastei no gráfico do mês"
         // So charts = Consolidated only.
         updateCharts(savedMonth.transactions);
-        
+
         lucide.createIcons();
     };
 
@@ -148,8 +148,8 @@ document.addEventListener('DOMContentLoaded', () => {
         sorted.forEach(t => {
             const isDraft = state.draft.find(d => d.id === t.id);
             const row = document.createElement('tr');
-            
-            const options = categoriesList.map(cat => 
+
+            const options = categoriesList.map(cat =>
                 `<option value="${cat}" ${t.category === cat ? 'selected' : ''}>${cat}</option>`
             ).join('');
 
@@ -205,7 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     el.btnConfirmReplicate.onclick = () => {
-        const numMonths = parseInt(el.replicateInput.value); 
+        const numMonths = parseInt(el.replicateInput.value);
         if (!numMonths || !txToReplicate) return;
 
         // Find transaction
@@ -223,11 +223,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // Create future installments (starting from month 2)
             const [y, m, d] = originTx.date.split('-').map(Number);
-            
+
             for (let i = 1; i < numMonths; i++) {
                 let nextYear = y;
                 let nextMonth = (m - 1) + i; // 0-indexed
-                
+
                 // Adjust Year/Month
                 while (nextMonth > 11) {
                     nextMonth -= 12;
@@ -237,10 +237,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Protect day overflow (Day 31 in 30-day month)
                 const lastDay = new Date(nextYear, nextMonth + 1, 0).getDate();
                 const targetDay = Math.min(d, lastDay);
-                
+
                 const targetMonthKey = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}`;
                 const targetDateStr = `${targetMonthKey}-${String(targetDay).padStart(2, '0')}`;
-                
+
                 const newTx = {
                     ...originTx,
                     id: Math.random().toString(36).substr(2, 9),
@@ -253,7 +253,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 state.consolidated[targetMonthKey].transactions.push(newTx);
             }
-            
+
             saveToDisk();
             updateUI();
             el.modalReplicate.style.display = 'none';
@@ -312,7 +312,7 @@ document.addEventListener('DOMContentLoaded', () => {
         item.onclick = () => {
             el.navItems.forEach(i => i.classList.remove('active'));
             el.tabContents.forEach(c => c.classList.remove('active'));
-            
+
             item.classList.add('active');
             document.getElementById(item.dataset.tab).classList.add('active');
         };
@@ -360,12 +360,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 };
 
                 const targetKey = getMonthKey(state.currentDate);
-                
+
                 parsed = results.map(i => {
                     const title = cleanTitle(getVal(i, 'Lançamento', 'Lancamento', 'title', 'descrição', 'descricao'));
                     const rawVal = getVal(i, 'Valor', 'amount', 'valor');
                     const val = cleanVal(rawVal);
-                    
+
                     if (val === 0) return null;
 
                     // Extração de Data
@@ -377,22 +377,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         const parts = rawDate.split('-');
                         originalDay = parts.length === 3 ? (parts[0].length === 4 ? parts[2] : parts[0]) : parts[0];
                     }
-                    
+
                     const forcedDate = `${targetKey}-${originalDay.toString().trim().padStart(2, '0')}`;
-                    
+
                     // Detecção Inteligente de Pagamento de Fatura (para pré-excluir do total)
-                    const isGenericPayment = (title.includes('PAGAMENTO') || title.includes('PGTO')) && 
-                                           (title.includes('RECEBIDO') || title.includes('ON LINE') || title.includes('EFETUADO'));
+                    const isGenericPayment = (title.includes('PAGAMENTO') || title.includes('PGTO')) &&
+                        (title.includes('RECEBIDO') || title.includes('ON LINE') || title.includes('EFETUADO'));
                     const isRefund = title.includes('ESTORNO') || title.includes('REEMBOLSO') || title.includes('CREDITO');
-                    
+
                     const shouldExclude = isGenericPayment && !isRefund && val < 0;
 
-                    return { 
-                        id: Math.random().toString(36).substr(2, 9), 
-                        date: forcedDate, 
-                        title, 
-                        amount: val, 
-                        origin: 'Cartão', 
+                    return {
+                        id: Math.random().toString(36).substr(2, 9),
+                        date: forcedDate,
+                        title,
+                        amount: val,
+                        origin: 'Cartão',
                         category: categorize(title),
                         excluded: shouldExclude
                     };
@@ -406,7 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     el.formManual.onsubmit = (e) => {
         e.preventDefault();
-        
+
         const totalAmount = parseFloat(document.getElementById('manual-value').value);
         const installments = parseInt(document.getElementById('manual-installments').value) || 1;
         const startDate = new Date(document.getElementById('manual-date').value + 'T12:00:00');
@@ -420,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
         for (let i = 0; i < installments; i++) {
             let nextYear = y;
             let nextMonth = (m - 1) + i;
-            
+
             while (nextMonth > 11) {
                 nextMonth -= 12;
                 nextYear++;
@@ -429,9 +429,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const lastDay = new Date(nextYear, nextMonth + 1, 0).getDate();
             const targetDay = Math.min(d, lastDay);
             const targetDateStr = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}-${String(targetDay).padStart(2, '0')}`;
-            
+
             const monthLabel = installments > 1 ? ` (${i + 1}/${installments})` : "";
-            
+
             newEntries.push({
                 id: Math.random().toString(36).substr(2, 9),
                 date: targetDateStr,
@@ -460,14 +460,14 @@ document.addEventListener('DOMContentLoaded', () => {
             type: 'doughnut',
             data: {
                 labels: Object.keys(categories),
-                datasets: [{ 
-                    data: Object.values(categories), 
+                datasets: [{
+                    data: Object.values(categories),
                     backgroundColor: [
-                        '#6366f1', '#f59e0b', '#22c55e', '#ef4444', '#ec4899', 
+                        '#6366f1', '#f59e0b', '#22c55e', '#ef4444', '#ec4899',
                         '#06b6d4', '#8b5cf6', '#10b981', '#f43f5e', '#fb923c',
                         '#6d28d9', '#be185d', '#15803d', '#b91c1c', '#a16207'
-                    ], 
-                    borderWidth: 0 
+                    ],
+                    borderWidth: 0
                 }]
             },
             options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }, cutout: '75%' }
@@ -492,13 +492,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const histCtx = document.getElementById('historyChart').getContext('2d');
         if (histChart) histChart.destroy();
         histChart = new Chart(histCtx, {
-            data: { 
-                labels: monthNames, 
+            data: {
+                labels: monthNames,
                 datasets: [
-                    { 
+                    {
                         type: 'line',
                         label: 'Renda Total',
-                        data: histIncome, 
+                        data: histIncome,
                         borderColor: '#22c55e',
                         backgroundColor: 'rgba(34, 197, 94, 0.1)',
                         borderWidth: 3,
@@ -506,28 +506,28 @@ document.addEventListener('DOMContentLoaded', () => {
                         pointRadius: 4,
                         fill: false
                     },
-                    { 
+                    {
                         type: 'bar',
                         label: 'Gastos',
-                        data: histTotals, 
-                        backgroundColor: '#6366f1', 
-                        borderRadius: 8 
+                        data: histTotals,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 8
                     }
-                ] 
+                ]
             },
-            options: { 
-                responsive: true, 
-                maintainAspectRatio: false, 
-                scales: { 
-                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } }, 
-                    x: { ticks: { color: '#94a3b8' } } 
-                }, 
-                plugins: { 
-                    legend: { 
-                        display: true, 
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                scales: {
+                    y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#94a3b8' } },
+                    x: { ticks: { color: '#94a3b8' } }
+                },
+                plugins: {
+                    legend: {
+                        display: true,
                         position: 'top',
-                        labels: { color: '#94a3b8', boxWidth: 12 } 
-                    } 
+                        labels: { color: '#94a3b8', boxWidth: 12 }
+                    }
                 },
                 onClick: (evt, elements) => {
                     if (elements.length > 0) {
@@ -547,18 +547,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- UTILS ---
     const getMonthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
     const formatMonthDisplay = (d) => d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }).replace(/^\w/, c => c.toUpperCase());
-    const formatPtDate = (s) => { if(!s) return ''; const [y,m,d] = s.split('-'); return `${d}/${m}/${y}`; };
-    const parseInterDate = (s) => { const [d,m,y] = s.split('/'); return `${y}-${m}-${d}`; };
+    const formatPtDate = (s) => { if (!s) return ''; const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; };
+    const parseInterDate = (s) => { const [d, m, y] = s.split('/'); return `${y}-${m}-${d}`; };
     const cleanVal = (s) => {
         if (!s) return 0;
         let str = s.toString().toUpperCase().replace('R$', '').replace(/\s/g, '');
-        
+
         // Identifica se é um crédito (reembolso, estorno ou sinal de menos/mais)
         const isCredit = str.includes('-') || str.includes('+') || str.includes('CREDIT') || str.includes('ESTORNO');
-        
+
         // Remove tudo que não for número, vírgula ou ponto
         let cleaned = str.replace(/[^0-9,/.]/g, '');
-        
+
         // Lógica Inteligente de Formato:
         if (cleaned.includes(',')) {
             // Se tem vírgula, padrão brasileiro: ponto é milhar (remove), vírgula é decimal (troca)
@@ -567,7 +567,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Se NÃO tem vírgula, o ponto já é o decimal (padrão internacional/CSV)
             // Não removemos nada, o parseFloat já entende o ponto.
         }
-        
+
         const val = parseFloat(cleaned) || 0;
         return isCredit ? -Math.abs(val) : Math.abs(val);
     };
@@ -600,14 +600,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- HANDLERS ---
     el.prevMonth.onclick = () => { state.currentDate.setMonth(state.currentDate.getMonth() - 1); updateUI(); };
     el.nextMonth.onclick = () => { state.currentDate.setMonth(state.currentDate.getMonth() + 1); updateUI(); };
-    
+
     el.btnManual.onclick = () => { document.getElementById('manual-date').value = state.currentDate.toISOString().split('T')[0]; el.modalManual.style.display = 'block'; };
-    
+
     el.btnEditIncome.onclick = () => {
         const mKey = getMonthKey(state.currentDate);
         const savedMonth = state.consolidated[mKey] || { income: { salary: 0, extra: 0 } };
         const inc = savedMonth.income || { salary: 0, extra: 0 };
-        
+
         document.getElementById('income-salary').value = inc.salary || 0;
         document.getElementById('income-extra').value = inc.extra || 0;
         el.modalIncome.style.display = 'block';
@@ -626,17 +626,17 @@ document.addEventListener('DOMContentLoaded', () => {
         e.preventDefault();
         const mKey = getMonthKey(state.currentDate);
         if (!state.consolidated[mKey]) state.consolidated[mKey] = { transactions: [] };
-        
+
         state.consolidated[mKey].income = {
             salary: parseFloat(document.getElementById('income-salary').value),
             extra: parseFloat(document.getElementById('income-extra').value)
         };
-        
+
         saveToDisk();
         updateUI();
         el.modalIncome.style.display = 'none';
     };
-    
+
     el.btnBackup.onclick = () => {
         try {
             const blob = new Blob([JSON.stringify(state)], { type: 'application/json' });
@@ -665,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 const content = event.target.result;
                 const importedState = JSON.parse(content);
-                
+
                 if (importedState && typeof importedState === 'object' && importedState.consolidated) {
                     state = importedState;
                     saveToDisk();
@@ -685,33 +685,24 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- AI LOGIC ---
-    // COLOQUE SUA CHAVE PADRÃO ABAIXO (Caso queira que outros usuários já comecem com IA ativa)
-    const GEMINI_API_KEY_DEFAULT = "SUA_CHAVE_AQUI";
-
     let aiSuggestions = [];
 
     const loadAiKey = () => {
         const key = localStorage.getItem('gemini_api_key');
-        if (key) {
-            el.aiApiKey.value = key;
-        } else if (GEMINI_API_KEY_DEFAULT !== "SUA_CHAVE_AQUI") {
-            el.aiApiKey.value = "CHAVE_PADRAO_ATIVA";
-            el.aiApiKey.placeholder = "Usando chave padrão do sistema";
-        }
+        if (key) el.aiApiKey.value = key;
     };
 
     el.btnSaveKey.onclick = () => {
         const key = el.aiApiKey.value.trim();
-        if (key && key !== "CHAVE_PADRAO_ATIVA") {
+        if (key) {
             localStorage.setItem('gemini_api_key', key);
-            alert("Chave de API personalizada salva com sucesso!");
+            alert("Chave de API salva com sucesso!");
         }
     };
 
     el.btnAiAudit.onclick = async () => {
-        let key = localStorage.getItem('gemini_api_key') || GEMINI_API_KEY_DEFAULT;
-        
-        if (!key || key === "SUA_CHAVE_AQUI") {
+        const key = localStorage.getItem('gemini_api_key');
+        if (!key) {
             alert("Por favor, configure sua chave de API na aba 'IA Assistant'.");
             return;
         }
@@ -738,7 +729,7 @@ document.addEventListener('DOMContentLoaded', () => {
         2. Sugira categorias melhores com base no título.
         3. Identifique duplicatas.
         
-        Transações: ${JSON.stringify(allTxs.map(t => ({id: t.id, title: t.title, amount: t.amount, category: t.category, date: t.date})))}
+        Transações: ${JSON.stringify(allTxs.map(t => ({ id: t.id, title: t.title, amount: t.amount, category: t.category, date: t.date })))}
         
         Retorne APENAS o JSON bruto no formato de array.`;
 
