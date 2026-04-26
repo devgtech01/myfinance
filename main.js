@@ -95,9 +95,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const cardTxs = allTransactions.filter(t => t.origin === 'Cartão');
         const manualTxs = allTransactions.filter(t => t.origin === 'Manual');
 
-        // Stats
-        const cardSum = cardTxs.reduce((a, b) => a + b.amount, 0);
-        const manualSum = manualTxs.reduce((a, b) => a + b.amount, 0);
+        // Stats - Only sum non-excluded transactions
+        const cardSum = cardTxs.reduce((a, b) => a + (b.excluded ? 0 : b.amount), 0);
+        const manualSum = manualTxs.reduce((a, b) => a + (b.excluded ? 0 : b.amount), 0);
         const expensesTotal = cardSum + manualSum;
 
         const income = savedMonth.income || { salary: 0, extra: 0 };
@@ -154,16 +154,19 @@ document.addEventListener('DOMContentLoaded', () => {
             ).join('');
 
             row.innerHTML = `
-                <td>${formatPtDate(t.date)}</td>
-                <td>${t.title} ${isDraft ? '<span class="badge">Novo</span>' : ''} ${t.amount < 0 ? '<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;">Crédito</span>' : ''}</td>
+                <td style="${t.excluded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${formatPtDate(t.date)}</td>
+                <td style="${t.excluded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${t.title} ${isDraft ? '<span class="badge">Novo</span>' : ''} ${t.amount < 0 ? '<span class="badge" style="background: rgba(34, 197, 94, 0.2); color: #22c55e;">Crédito</span>' : ''}</td>
                 <td>
                     <select class="category-select" data-id="${t.id}">
                         ${options}
                     </select>
                 </td>
-                <td class="${t.amount < 0 ? 'amount-positive' : 'amount-negative'}">${formatBRL(t.amount)}</td>
+                <td class="${t.amount < 0 ? 'amount-positive' : 'amount-negative'}" style="${t.excluded ? 'text-decoration: line-through; opacity: 0.5;' : ''}">${formatBRL(t.amount)}</td>
                 <td>
                     <div class="table-actions">
+                        <button class="btn-action btn-toggle-exclude" data-id="${t.id}" title="${t.excluded ? 'Incluir no Total' : 'Excluir do Total'}">
+                            <i data-lucide="${t.excluded ? 'eye-off' : 'eye'}"></i>
+                        </button>
                         <button class="btn-action btn-move" data-id="${t.id}" title="Mover Mês">
                             <i data-lucide="calendar-days"></i>
                         </button>
@@ -177,6 +180,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         // Event Listeners
+        tbody.querySelectorAll('.btn-toggle-exclude').forEach(btn => {
+            btn.onclick = () => toggleExclude(btn.dataset.id);
+        });
         tbody.querySelectorAll('.category-select').forEach(select => {
             select.onchange = (e) => updateTxCategory(select.dataset.id, e.target.value);
         });
@@ -272,6 +278,23 @@ document.addEventListener('DOMContentLoaded', () => {
         updateUI();
     };
 
+    const toggleExclude = (id) => {
+        const dIdx = state.draft.findIndex(t => t.id === id);
+        if (dIdx !== -1) {
+            state.draft[dIdx].excluded = !state.draft[dIdx].excluded;
+        } else {
+            const mKey = getMonthKey(state.currentDate);
+            if (state.consolidated[mKey]) {
+                const txIdx = state.consolidated[mKey].transactions.findIndex(t => t.id === id);
+                if (txIdx !== -1) {
+                    state.consolidated[mKey].transactions[txIdx].excluded = !state.consolidated[mKey].transactions[txIdx].excluded;
+                }
+            }
+        }
+        saveToDisk();
+        updateUI();
+    };
+
     const removeTx = (id) => {
         // Remove from draft
         state.draft = state.draft.filter(t => t.id !== id);
@@ -357,13 +380,21 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     const forcedDate = `${targetKey}-${originalDay.toString().trim().padStart(2, '0')}`;
                     
+                    // Detecção Inteligente de Pagamento de Fatura (para pré-excluir do total)
+                    const isGenericPayment = (title.includes('PAGAMENTO') || title.includes('PGTO')) && 
+                                           (title.includes('RECEBIDO') || title.includes('ON LINE') || title.includes('EFETUADO'));
+                    const isRefund = title.includes('ESTORNO') || title.includes('REEMBOLSO') || title.includes('CREDITO');
+                    
+                    const shouldExclude = isGenericPayment && !isRefund && val < 0;
+
                     return { 
                         id: Math.random().toString(36).substr(2, 9), 
                         date: forcedDate, 
                         title, 
                         amount: val, 
                         origin: 'Cartão', 
-                        category: categorize(title) 
+                        category: categorize(title),
+                        excluded: shouldExclude
                     };
                 });
 
