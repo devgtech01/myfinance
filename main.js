@@ -439,9 +439,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 amount: installmentValue,
                 origin: 'Manual',
                 category: category
-            });
-        }
-
         state.draft.push(...newEntries);
         el.modalManual.style.display = 'none';
         el.formManual.reset();
@@ -449,49 +446,66 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- CHARTS ---
-    const updateCharts = (txs) => {
-        // Category Chart
-        const categories = {};
-        txs.forEach(t => categories[t.category] = (categories[t.category] || 0) + t.amount);
+    const updateCharts = (transactions) => {
+        // 1. Gráfico de Rosca (Categorias)
+        const categories = transactions.reduce((acc, t) => {
+            if (t.excluded) return acc;
+            // No gráfico de rosca, mostramos apenas gastos reais (positivos)
+            // Reembolsos são abatimentos no total, mas não categorias de gasto
+            if (t.amount > 0) {
+                acc[t.category] = (acc[t.category] || 0) + t.amount;
+            }
+            return acc;
+        }, {});
 
         const catCtx = document.getElementById('categoryChart').getContext('2d');
         if (catChart) catChart.destroy();
-        catChart = new Chart(catCtx, {
-            type: 'doughnut',
-            data: {
-                labels: Object.keys(categories),
-                datasets: [{
-                    data: Object.values(categories),
-                    backgroundColor: [
-                        '#6366f1', '#f59e0b', '#22c55e', '#ef4444', '#ec4899',
-                        '#06b6d4', '#8b5cf6', '#10b981', '#f43f5e', '#fb923c',
-                        '#6d28d9', '#be185d', '#15803d', '#b91c1c', '#a16207'
-                    ],
-                    borderWidth: 0
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } }, cutout: '75%' }
-        });
 
-        // History Chart - Full Year (Jan to Dec)
-        const currentYear = state.currentDate.getFullYear();
-        const months = [];
-        for (let i = 0; i < 12; i++) {
-            const m = String(i + 1).padStart(2, '0');
-            months.push(`${currentYear}-${m}`);
+        if (Object.keys(categories).length > 0) {
+            catChart = new Chart(catCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(categories),
+                    datasets: [{
+                        data: Object.values(categories),
+                        backgroundColor: [
+                            '#6366f1', '#f59e0b', '#22c55e', '#ef4444', '#ec4899',
+                            '#06b6d4', '#8b5cf6', '#10b981', '#f43f5e', '#fb923c',
+                            '#6d28d9', '#be185d', '#15803d', '#b91c1c', '#a16207'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#94a3b8' } } },
+                    cutout: '75%'
+                }
+            });
         }
 
-        const histTotals = months.map(m => (state.consolidated[m]?.transactions || []).reduce((a, b) => a + b.amount, 0));
-        const histIncome = months.map(m => {
-            const inc = state.consolidated[m]?.income || { salary: 0, extra: 0 };
-            return (parseFloat(inc.salary) || 0) + (parseFloat(inc.extra) || 0);
+        // 2. Gráfico de Histórico
+        const currentYear = state.currentDate.getFullYear();
+        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        
+        const histTotals = monthNames.map((_, idx) => {
+            const mKey = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
+            const mData = state.consolidated[mKey] || { transactions: [] };
+            const total = mData.transactions.reduce((sum, t) => sum + (t.excluded ? 0 : t.amount), 0);
+            return Math.max(0, total); // Não deixar a barra ir para baixo de zero
         });
 
-        const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+        const histIncome = monthNames.map((_, idx) => {
+            const mKey = `${currentYear}-${String(idx + 1).padStart(2, '0')}`;
+            const mData = state.consolidated[mKey] || { income: { salary: 0, extra: 0 } };
+            return (parseFloat(mData.income.salary) || 0) + (parseFloat(mData.income.extra) || 0);
+        });
 
         const histCtx = document.getElementById('historyChart').getContext('2d');
         if (histChart) histChart.destroy();
         histChart = new Chart(histCtx, {
+            type: 'bar',
             data: {
                 labels: monthNames,
                 datasets: [
@@ -523,17 +537,12 @@ document.addEventListener('DOMContentLoaded', () => {
                     x: { ticks: { color: '#94a3b8' } }
                 },
                 plugins: {
-                    legend: {
-                        display: true,
-                        position: 'top',
-                        labels: { color: '#94a3b8', boxWidth: 12 }
-                    }
+                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', boxWidth: 12 } }
                 },
                 onClick: (evt, elements) => {
                     if (elements.length > 0) {
-                        const index = elements[0].index;
-                        const [y, m] = months[index].split('-');
-                        state.currentDate = new Date(y, m - 1, 1);
+                        const idx = elements[0].index;
+                        state.currentDate = new Date(currentYear, idx, 1);
                         updateUI();
                     }
                 },
@@ -721,19 +730,19 @@ document.addEventListener('DOMContentLoaded', () => {
         el.aiContent.innerHTML = '';
         el.btnApplyAi.style.display = 'none';
 
-        const prompt = `Você é um auditor financeiro. Analise estas transações de cartão de crédito em formato JSON e retorne um ARRAY de sugestões no formato JSON: 
-        [{"id": "id_da_transacao", "field": "amount|category|title|action", "oldValue": "valor_antigo", "newValue": "valor_sugerido", "reason": "explicação_curta", "total": 10, "current": 2}]
+        const prompt = `Você é um auditor financeiro. Analise estas transações de cartão de crédito e retorne um ARRAY JSON: 
+        [{"id": "id", "field": "amount|category|title|action", "oldValue": "...", "newValue": "...", "reason": "...", "total": 10, "current": 2}]
         
         Regras:
-        1. Identifique se o sinal (positivo/negativo) parece estar errado. Reembolsos e pagamentos devem ser negativos. Compras positivas.
-        2. Sugira categorias melhores com base no título.
+        1. Identifique se o sinal parece estar errado. Reembolsos/Pagamentos = Negativo. Compras = Positivo.
+        2. Melhore as categorias.
         3. Identifique duplicatas.
-        4. Identifique COMPRAS PARCELADAS no título (ex: "Loja X 1/6" ou "Parcela 2 de 10"). 
-           Se encontrar uma parcela X de Y, retorne um item com field="action", newValue="replicate", total=Y e current=X.
+        4. Detecte PARCELAS (ex: "Amazon 1/6" ou "2/10"). 
+           Se encontrar "X de Y", retorne action="replicate", newValue="replicate", total=Y, current=X.
         
         Transações: ${JSON.stringify(allTxs.map(t => ({ id: t.id, title: t.title, amount: t.amount, category: t.category, date: t.date })))}
         
-        Retorne APENAS o JSON bruto no formato de array.`;
+        IMPORTANTE: Retorne APENAS o JSON.`;
 
         try {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
