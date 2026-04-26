@@ -318,56 +318,45 @@ document.addEventListener('DOMContentLoaded', () => {
                 const headers = r.meta.fields.map(h => h.trim().toLowerCase());
                 let parsed = [];
 
-                // IMPORTANTE: Forçar todos os gastos para o mês atualmente selecionado
+                // Helper para pegar valor de coluna ignorando maiúsculas/minúsculas
+                const getVal = (row, ...keys) => {
+                    for (let k of keys) {
+                        const found = Object.keys(row).find(key => key.trim().toLowerCase() === k.toLowerCase());
+                        if (found) return row[found];
+                    }
+                    return "";
+                };
+
                 const targetKey = getMonthKey(state.currentDate);
+                
+                parsed = results.map(i => {
+                    const title = cleanTitle(getVal(i, 'Lançamento', 'Lancamento', 'title', 'descrição', 'descricao'));
+                    const rawVal = getVal(i, 'Valor', 'amount', 'valor');
+                    const val = cleanVal(rawVal);
+                    
+                    if (val === 0) return null;
 
-                if (headers.includes('lancamento') || headers.includes('lançamento')) {
-                    parsed = results.map(i => {
-                        const rawVal = i['Valor'];
-                        const title = cleanTitle(i['Lançamento'] || i['Lancamento']);
-                        const val = cleanVal(rawVal);
-                        
-                        if (val === 0) return null;
-                        
-                        // Ignorar apenas pagamentos de fatura, manter estornos/reembolsos
-                        const isBill = (title.includes('PAGAMENTO') || title.includes('PGTO')) && 
-                                     (title.includes('FATURA') || title.includes('RECEBIDO') || title.includes('EFETUADO') || title.includes('ON LINE'));
-                        const isCredit = title.includes('ESTORNO') || title.includes('REEMBOLSO') || title.includes('CREDITO') || title.includes('CRÉDITO');
-                        
-                        if (isBill && !isCredit) return null;
-                        
-                        // Manter o dia original, mas forçar mês/ano do contexto atual
-                        const originalDay = (i['Data'] || "").split('/')[0] || "01";
-                        const forcedDate = `${targetKey}-${originalDay.padStart(2, '0')}`;
-                        
-                        return { id: Math.random().toString(36).substr(2, 9), date: forcedDate, title, amount: val, origin: 'Cartão', category: categorize(title) };
-                    });
-                } else {
-                    parsed = results.map(i => {
-                        const val = cleanVal(i['amount'] || i['valor']);
-                        const title = cleanTitle(i['title'] || i['descrição'] || i['lancamento']);
-                        
-                        if (val === 0) return null;
-
-                        const isBill = (title.includes('PAGAMENTO') || title.includes('PGTO')) && 
-                                     (title.includes('FATURA') || title.includes('RECEBIDO') || title.includes('EFETUADO'));
-                        const isCredit = title.includes('ESTORNO') || title.includes('REEMBOLSO') || title.includes('CREDITO') || title.includes('CRÉDITO');
-                        
-                        if (isBill && !isCredit) return null;
-                        
-                        const rawDate = i['date'] || i['data'] || "";
-                        let originalDay = "01";
-                        if (rawDate.includes('/')) {
-                            originalDay = rawDate.split('/')[0]; // DD/MM/YYYY
-                        } else if (rawDate.includes('-')) {
-                            const parts = rawDate.split('-');
-                            originalDay = parts.length === 3 ? parts[2] : parts[0]; // YYYY-MM-DD or DD-MM-YYYY
-                        }
-                        const forcedDate = `${targetKey}-${originalDay.toString().padStart(2, '0')}`;
-                        
-                        return { id: Math.random().toString(36).substr(2, 9), date: forcedDate, title, amount: val, origin: 'Cartão', category: categorize(title) };
-                    });
-                }
+                    // Extração de Data
+                    const rawDate = getVal(i, 'Data', 'date', 'data');
+                    let originalDay = "01";
+                    if (rawDate.includes('/')) {
+                        originalDay = rawDate.split('/')[0];
+                    } else if (rawDate.includes('-')) {
+                        const parts = rawDate.split('-');
+                        originalDay = parts.length === 3 ? (parts[0].length === 4 ? parts[2] : parts[0]) : parts[0];
+                    }
+                    
+                    const forcedDate = `${targetKey}-${originalDay.toString().trim().padStart(2, '0')}`;
+                    
+                    return { 
+                        id: Math.random().toString(36).substr(2, 9), 
+                        date: forcedDate, 
+                        title, 
+                        amount: val, 
+                        origin: 'Cartão', 
+                        category: categorize(title) 
+                    };
+                });
 
                 state.draft.push(...parsed.filter(x => x));
                 updateUI();
