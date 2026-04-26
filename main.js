@@ -722,12 +722,14 @@ document.addEventListener('DOMContentLoaded', () => {
         el.btnApplyAi.style.display = 'none';
 
         const prompt = `Você é um auditor financeiro. Analise estas transações de cartão de crédito em formato JSON e retorne um ARRAY de sugestões no formato JSON: 
-        [{"id": "id_da_transacao", "field": "amount|category|title", "oldValue": "valor_antigo", "newValue": "valor_sugerido", "reason": "explicação_curta"}]
+        [{"id": "id_da_transacao", "field": "amount|category|title|action", "oldValue": "valor_antigo", "newValue": "valor_sugerido", "reason": "explicação_curta", "total": 10, "current": 2}]
         
         Regras:
         1. Identifique se o sinal (positivo/negativo) parece estar errado. Reembolsos e pagamentos devem ser negativos. Compras positivas.
         2. Sugira categorias melhores com base no título.
         3. Identifique duplicatas.
+        4. Identifique COMPRAS PARCELADAS no título (ex: "Loja X 1/6" ou "Parcela 2 de 10"). 
+           Se encontrar uma parcela X de Y, retorne um item com field="action", newValue="replicate", total=Y e current=X.
         
         Transações: ${JSON.stringify(allTxs.map(t => ({ id: t.id, title: t.title, amount: t.amount, category: t.category, date: t.date })))}
         
@@ -761,17 +763,55 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         el.btnApplyAi.style.display = 'block';
-        el.aiContent.innerHTML = suggestions.map(s => `
-            <div class="ai-suggestion-item ${s.field === 'amount' ? 'warning' : ''}">
-                <h4>${s.reason}</h4>
-                <p>De: <b>${s.oldValue}</b> para <b>${s.newValue}</b></p>
-                <small>ID: ${s.id}</small>
-            </div>
-        `).join('');
+        el.aiContent.innerHTML = suggestions.map(s => {
+            let detail = `De: <b>${s.oldValue}</b> para <b>${s.newValue}</b>`;
+            if (s.newValue === 'replicate') {
+                detail = `Detectado: Parcela ${s.current} de ${s.total}. Criar parcelas restantes?`;
+            }
+            return `
+                <div class="ai-suggestion-item ${s.field === 'amount' ? 'warning' : (s.newValue === 'replicate' ? 'info' : '')}">
+                    <h4>${s.reason}</h4>
+                    <p>${detail}</p>
+                    <small>ID: ${s.id}</small>
+                </div>
+            `;
+        }).join('');
     };
 
     el.btnApplyAi.onclick = () => {
         aiSuggestions.forEach(s => {
+            if (s.newValue === 'replicate') {
+                // Lógica de replicação automática via IA
+                const allTxs = [...state.draft, ...Object.values(state.consolidated).flatMap(m => m.transactions)];
+                const originTx = allTxs.find(t => t.id === s.id);
+                if (originTx) {
+                    const remaining = s.total - s.current;
+                    if (remaining > 0) {
+                        const [y, m, d] = originTx.date.split('-').map(Number);
+                        for (let i = 1; i <= remaining; i++) {
+                            let nextYear = y;
+                            let nextMonth = (m - 1) + i;
+                            while (nextMonth > 11) { nextMonth -= 12; nextYear++; }
+                            const lastDay = new Date(nextYear, nextMonth + 1, 0).getDate();
+                            const targetDay = Math.min(d, lastDay);
+                            const targetMonthKey = `${nextYear}-${String(nextMonth + 1).padStart(2, '0')}`;
+                            const targetDateStr = `${targetMonthKey}-${String(targetDay).padStart(2, '0')}`;
+                            
+                            const newTx = {
+                                ...originTx,
+                                id: Math.random().toString(36).substr(2, 9),
+                                date: targetDateStr,
+                                title: originTx.title.replace(`${s.current}/${s.total}`, `${s.current + i}/${s.total}`)
+                            };
+
+                            if (!state.consolidated[targetMonthKey]) state.consolidated[targetMonthKey] = { transactions: [] };
+                            state.consolidated[targetMonthKey].transactions.push(newTx);
+                        }
+                    }
+                }
+                return;
+            }
+
             // Aplicar no draft
             const dIdx = state.draft.findIndex(t => t.id === s.id);
             if (dIdx !== -1) {
